@@ -45,11 +45,11 @@ int main (int argc, char **argv) {
 
 	// Dynamic parameters. Last arg is the default value. You can assign these from a launch file.
   bool use_cartesian_command;
-	nh.param("use_cartesian_command", use_cartesian_command, true);
+	nh.param("use_cartesian_command", use_cartesian_command, false);
 
 	// Dynamic parameter to choose the rate at wich this node should run
   double ros_rate;
-	nh.param("ros_rate", ros_rate, 0.1); // 0.1 Hz = 10 seconds
+	nh.param("ros_rate", ros_rate, 0.2); // 0.2 Hz = 5 seconds
 	ros::Rate* loop_rate_ = new ros::Rate(ros_rate);
 
   iiwa_msgs::CartesianPose command_cartesian_position;
@@ -57,6 +57,16 @@ int main (int argc, char **argv) {
   bool new_pose = false, motion_done = false;
 
 	int direction = 1;
+  bool invert = false;
+  int loop_count = 0;
+  int num_poses = 8;
+  double a1_pose[8] = {1.15831, 1.78888, 1.13479, 1.61179, 0.50017, 1.48084, 0.10912, 1.84329};
+  double a2_pose[8] = {1.45563, 1.51025, 1.08052, 1.03553, 1.19027, 0.81667, 0.85254, 0.63564};
+  double a3_pose[8] = {0.86079, 0.29102, 0.28445, 0.28297, 1.18138, 0.48594, 1.18802, 0.27096};
+  double a4_pose[8] = {-0.46111, -0.20181, -0.81160, -0.95024, -1.48719, -1.55177, -2.04835, -1.81695};
+  double a5_pose[8] = {-0.52797, -0.78495, -0.02152, -0.52812, -0.80416, -0.63857, -0.75608, -0.64296};
+  double a6_pose[8] = {1.08759, 1.39308, 1.39142, 1.29087, 1.16503, 1.09915, 0.85577, 1.04670};
+  double a7_pose[8] = {-0.03264, 0.53630, 0.00010, -0.03285, 0.36581, 0.68564, 0.57598, 1.03574};
 
 	while (ros::ok()) {
     if (iiwa_pose_state.isConnected()) {
@@ -70,16 +80,32 @@ int main (int argc, char **argv) {
 			} else {
         while (!iiwa_joint_state.isConnected()) {}
         command_joint_position = iiwa_joint_state.getPosition();
-        command_joint_position.position.a4 -= direction * 5 * M_PI / 180; // 0.0872665 // Adding/Subtracting 5 degrees (in radians) to the 4th joint
+        command_joint_position.position.a1 = a1_pose[loop_count];
+        command_joint_position.position.a2 = a2_pose[loop_count];
+        command_joint_position.position.a3 = a3_pose[loop_count];
+        command_joint_position.position.a4 = a4_pose[loop_count];
+        command_joint_position.position.a5 = a5_pose[loop_count];
+        command_joint_position.position.a6 = a6_pose[loop_count];
+        command_joint_position.position.a7 = a7_pose[loop_count];        
 				iiwa_joint_command.setPosition(command_joint_position);
+        ROS_WARN_STREAM("Sending command to Robot for pose #" << loop_count);
 			}
 
 			sleepForMotion(iiwa_time_destination, 2.0);
-
-			direction *= -1; // In the next iteration the motion will be on the opposite direction
-
+      if (!invert){
+        if (loop_count < (num_poses-1))
+          loop_count++;
+        else
+          invert = true;
+      } else {
+          if (loop_count > 0)
+            loop_count--;
+          else
+            invert = false;
+      }
 			loop_rate_->sleep(); // Sleep for some millisecond. The while loop will run every 10 seconds in this example.
-		}
+		
+    }
 		else {
 			ROS_WARN_STREAM("Robot is not connected...");
 			ros::Duration(5.0).sleep(); // 5 seconds
